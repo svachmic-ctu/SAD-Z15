@@ -45,10 +45,26 @@ title('Missing values replaced by mean')
 %% Assignment 1:  
 % replace missing values by 1NN and visualize results
 knndata = data;
+color_knn = color;
+color_knn(anyNanRow) = 0.7;
 
-% %%%%%%%%% Zde doplnte kod dle ukolu 1 %%%%%%%%%%%%%
+nanVals = isnan(knndata);
+noNans = sum(nanVals,2) == 0;
+dataNoNans = data(noNans,:);
 
-%
+index = 1:200;
+for i = index(anyNanRow)
+    selsample = knndata(i, :);  
+    mask = isnan(selsample);
+    if ~all(mask)
+        selectedOrig = knndata(i,:);
+        selected = knndata(i, ~mask);
+        noNansMasked = dataNoNans(:, ~mask);
+        idx = knnsearch(noNansMasked, selected);
+        
+        knndata(i, mask) = dataNoNans(idx, mask);
+    end
+end
 
 figure
 scatter3(knndata(:,1), knndata(:,2), knndata(:,3), shape, color_knn)
@@ -69,9 +85,21 @@ title('Non-standardized 2D visualization');
 
 %% Assignment 2:  2D scatter plot of 3D data by PCA - with standardization
 
-% %%%%%%%%% Zde doplnte kod dle ukolu 2 %%%%%%%%%%%%%
+standardized_knndata_pca = knndata_pca;
+[h, w] = size(standardized_knndata_pca);
+mean_d = mean(knndata_pca);
+standard_d = std(knndata_pca);
 
-%
+for i = 1:h
+    tmp = standardized_knndata_pca(i,:);
+    for j = 1:3
+        standardized_knndata_pca(i,j) = (tmp(j) - mean_d(j))/standard_d(j);
+    end
+    
+    %standardized_knndata_pca(i,1) = (tmp(1) - mean_d(1))/standard_d(1);
+    %standardized_knndata_pca(i,2) = (tmp(2) - mean_d(2))/standard_d(2);
+    %standardized_knndata_pca(i,3) = (tmp(3) - mean_d(3))/standard_d(3);
+end
 
 coeff = princomp(standardized_knndata_pca);
 pca=knndata_pca*coeff;
@@ -147,7 +175,65 @@ while(1)
     % %%%%%%%%% Zde doplnte kod dle ukolu 3 %%%%%%%%%%%%%    
     newX = X;        
     % ### BEGIN of outlier removal code ###
-  
+    
+    removed = 0;
+    for i = 1:m
+        index = i - removed;
+        c = newC(index,:);
+        
+        clusterSize = 0;
+        for j = 1:size(newP,1)
+            if i == newP(j,1)
+                clusterSize = clusterSize + 1;
+            end
+        end
+        
+        if clusterSize > 1
+            smax = -9999;
+            smax_idx = -1;
+            smin = 9999;
+            
+            lenP = size(newP, 1);
+            for k = 1:lenP
+                if i == newP(k,1)
+                    tmp = newX(k,:);
+                    d = pdist([c, tmp], 'euclidean');
+                    %smax = max(smax, d);
+                    if smax < d
+                        smax = d;
+                        smax_idx = k;
+                    end
+                    
+                    smin = min(smin, d);
+                end
+            end
+            
+            distortion = smin/smax;
+            if distortion < th
+                if smax_idx ~= -1
+                    %[newP, newC, newX] = removeSample(smax, xnew)
+                    newP(smax_idx,:) = [];
+                    newX(smax_idx,:) = [];
+                end
+            end
+        else
+            %[newP, newC, newX] = removeCluster(c, xnew)
+            
+            removedClust = 0;
+            for m = 1:size(newP,1)
+                idx = m - removedClust;
+                if i == newP(idx,1)
+                    newP(idx,:) = [];
+                    newX(idx,:) = [];
+                    removedClust = removedClust + 1;
+                end
+            end
+            
+            newC(index,:) = [];
+            m = m - 1;
+            removed = removed + 1;
+        end
+    end
     
     % END of outlier removal code
     
